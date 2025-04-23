@@ -108,69 +108,15 @@ bump-my-version patch  # bumps from e.g. 0.3.2 to 0.3.3
 This section describes how to make a release in 3 parts:
 
 1. preparation
-1. making a release on PyPI
 1. making a release on GitHub
 
-### (1/3) Preparation
+### (1/2) Preparation
 
 1. Verify that the information in CITATION.cff is correct.
 1. Make sure the [version has been updated](#versioning).
 1. Run the unit tests with `pytest -v`
 
-### (2/3) PyPI
-
-In a new terminal:
-
-```shell
-# OPTIONAL: prepare a new directory with fresh git clone to ensure the release
-# has the state of origin/main branch
-cd $(mktemp -d mibibio.XXXXXX)
-git clone git@github.com:MiBiPreT/mibibio .
-
-# make sure to have a recent version of pip and the publishing dependencies
-python -m pip install --upgrade pip
-python -m pip install .[publishing]
-
-# create the source distribution and the wheel
-python -m build
-
-# upload to test pypi instance (requires credentials)
-python -m twine upload --repository testpypi dist/*
-```
-
-Visit [https://test.pypi.org/](https://test.pypi.org)
-<!-- [https://test.pypi.org/project/mibibio](https://test.pypi.org/project/mibibio) -->
-and verify that your package was uploaded successfully. Keep the terminal open, we'll need it later.
-
-In a new terminal, without an activated virtual environment or an env directory:
-
-```shell
-cd $(mktemp -d mibibio-test.XXXXXX)
-
-# prepare a clean virtual environment and activate it
-python -m venv env
-source env/bin/activate
-
-# make sure to have a recent version of pip and setuptools
-python -m pip install --upgrade pip
-
-# install from test pypi instance:
-python -m pip -v install --no-cache-dir \
---index-url https://test.pypi.org/simple/ \
---extra-index-url https://pypi.org/simple mibibio
-```
-
-Check that the package works as it should when installed from pypitest.
-
-Then upload to pypi.org with:
-
-```shell
-# Back to the first terminal,
-# FINAL STEP: upload to PyPI (requires credentials)
-python -m twine upload dist/*
-```
-
-### (3/3) GitHub
+### (2/2) GitHub
 
 Also make a [release on GitHub](https://github.com/MiBiPreT/mibibio/releases/new). If your repository uses the GitHub-Zenodo integration this will also trigger Zenodo into making a snapshot of your repository and sticking a DOI on it.
 
