@@ -2,7 +2,7 @@
 
 ## How to use mibibio
 
-A collection of analytical and semi-semianalytical solutions for hydrogeological transport phenomena
+Collection of microbial analysis workflows to investigate microbiological community structure, characteristics and their degradation potential.
 
 ## Installation
 
