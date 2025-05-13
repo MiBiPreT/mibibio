@@ -1,3 +1,0 @@
-# `mibibio` API reference
-
-::: mibibio
