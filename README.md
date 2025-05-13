@@ -5,19 +5,14 @@
 
 Collection of microbial analysis workflows to investigate microbiological community structure, characteristics and their degradation potential.
 
-## Installation of most recent development version
+## Getting a copy of mibibio
 
-To install mibibio from the GitHub repository directly, do:
+To get a copy of the mibibio repository, do:
 
 ```console
 git clone git@github.com:MiBiPreT/mibibio.git
 cd mibibio
-python -m pip install .
 ```
-
-## Documentation
-
-[See the full `mibibio` documentation here](https://mibipret.github.io/mibibio/)
 
 ## Contributing
 
