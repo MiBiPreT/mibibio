@@ -1,0 +1,205 @@
+---
+title: "From cleaned microbiome data, to microbiome traits, similar to microbiome analyst"
+output: html_document
+---
+
+Originally by Simon Vandersanden
+Adapted by: **Simon Vandersanden**, simon.vandersanden@uhasselt.be  
+Last edits: 24/03/2025
+
+Notes before starting:  
+-
+
+A chunk of code to set the working directory
+
+
+```{r, setup, include=FALSE}
+knitr::opts_knit$set(root.dir = 'C:/Amplicon_sequencing_analysis/SIMON_SCRIPTS_2025/Cleaned_UP_Scripts_Alraune/Mock_Markdown_Files/input')
+
+```
+
+
+
+
+Load in the different packages needed to perform the analysis 
+Maybe also specify the input and output directory, so the output is saved in an orderly manner
+```{r, echo=FALSE}
+#Load in the packages
+library(phyloseq)
+library(crosstalk)
+library(shiny)
+library(dplyr)
+```
+
+#Import the data, this can be done in different formats 
+```{r, include=FALSE}
+#As a phyloseq object, previously generated.
+Phylo_Object <- readRDS("ps_IdTax_noncontam_NoMito_No_Chloro.rds")
+
+#You can extract the different parts from this combined object:
+Mibi_Otu_Table  <- otu_table(Phylo_Object)
+Mibi_Tax_Table <- tax_table(Phylo_Object)
+#phylo_tree <- phy_tree(Phylo_Object)
+Mibi_Meta_Table <- sample_data(Phylo_Object)
+###Or load the data in as seperate different objects which can or cannot be combined into a phyloseq object
+#Load in the OTU table, this is a count table with information with regard to the specific OTU/ASV's, and how many times they are found in specific samples.
+Mibi_Otu_Table <- read.csv(path_to_object)
+#Load in the Tax table, this is a table containing taxonomic information with regard to each specific OTU/ASV sequence.
+Mibi_Tax_Table <- read.csv(path_to_object)
+#Table containing the metadata with regard to each sample, this is a table with the samples as row and collumns for the different traits of each sample, here also physicochemical data can be added (potentially from previous Mibirem modules, example: availability of electron acceptors,...)
+Mibi_Meta_Table <- read.table("META_Griftpark_Enrichments_Form.txt", header = T, sep = "\t", row.names = 1, stringsAsFactors = FALSE)
+#This object contains the different ASV/OTU sequences, and some information with regard to the 'evolutionary distances' between the sequences. These tree values are needed to calculate several metrics like Alfa (Faiths phylogenetic diversity) and Beta diversity (Unifraq distances)
+Mibi_Phylo_Tree <- read.csv(path_to_object)
+#These can be held separate or combined into a phyloseq object
+Phyloseq_Object <- phyloseq(otu_table(Mibi_Otu_Table, taxa_are_rows=F),
+               tax_table(Mibi_Tax_Table), phy_tree(Mibi_Phylo_Tree), sample_data(Mibi_Meta_Table))
+```
+
+#Data filtering step
+```{r}
+#It would be nice to have a small data filtering step, containing similar options as microbiome analyst. Because this is depend on the research question asked.
+
+# You can basically decide the degree of error you will allow/ how complete you want to view the data.
+#For further visualisation steps it is already usefull to be able to select specific sets of samples. However currently you need to manually select specific samples, It would be nice to have function to select samples based on metadata. example: you have a combination of groundwater/soil data, and with one click you can select to continue the analysis with the soil data, or all samples with 'low electron acceptor availability'.
+#Then you can continue with the specific set of samples you are interested in
+```
+
+#Data normalisation step
+```{r}
+#Due to variability in sampling depth,sparsity of the data,...
+# Often normalisation steps can be done to meaningly compare samples to one another.
+#However there are various ways of normalising the data, this is a decision made by the researcher, because they each work differently. Good documentation can be found on the Microbiome analyst.
+#This is something that should be double checked with a good statistician to decide on some general 'safe ways' to normalise data which has specific traits.
+#I think there can be a decision tree made, that can help inform the user on which normalisation that can be made. 
+```
+
+
+
+#Microbiome analyst usefull 'visualisation exploration'
+```{r, as first functionality}
+#Rarefaction curve
+#It is usefull to check this trait of you data, it gives you some information on the quality of the sequencing. and could be usefull to determine the normalisation method. It basically gives you perspective on the sampling depth and the number of unique features that are found. Here you can see if the sequencing depth you did was sufficient to 'find all the unique sequences'
+mbSet<-PlotRarefactionCurve(mbSet, "filt","SC_number","SC_number","SC_number","5","rarefaction_curve_0","png");
+#Stacked bar/area plot: Gives an overall picture with regard to the community; A lot of different customization ways are available on microbial analyst. This could be copied, or different standart ways can be choosen, like plotting the relative abundance of the phylum, order, 
+mbSet<-PlotTaxaAundanceBar(mbSet, "taxa_alpha_0","Phylum","SC_number", "null", "barraw",10, "set3","sum",10, "bottom", "F", "png")
+
+
+
+```
+
+#Community profiling 
+```{r}
+# Alfa diversity metrics: the species diversity within a local samples.
+#Here there are different options available on microbiome analyst:
+#Shannon diversity 
+mbSet<-PlotAlphaData(mbSet, "filt","alpha_diver_1","Shannon","SC_number","OTU", "default", "png");
+mbSet<-PlotAlphaBoxData(mbSet, "alpha_diverbox_1","Shannon","SC_number","default", "png");
+```
+#Personal alfa diversity selection
+```{r}
+###I paste here my RAW RAW script, this can be cleaned up:
+#However here i have some prefered other diversity metrics, which are not available on microibomes analyst.
+
+###Phylogenetic diversity (faiths)###
+#here you need a phyloseq object with a phylogenetic tree.
+#Faiths: the sum of the branch lengths on the minimum spanning tree linking a set of terminal taxa to the root 
+#PD=i∈S∑​Li​
+#where SSS represents the set of branches in the minimum spanning phylogenetic tree connecting all observed taxa in a sample, and LiL_iLi​ is the branch length of each branch.
+
+library(btools)
+phylogenetic_Diversity <-estimate_pd(Mibi_Phylo_Object)
+View(phylogenetic_Diversity)
+estimate_pd(Phyloseq_Object)
+help("estimate_pd")
+write.table(phylogenetic_Diversity, file = "phylogenetic_Diversity.csv", row.names = T, sep = ";", dec = ",")  
+####################################
+###'Dominance' alfa diversity (Berger-parker})###
+# it is usefull to determine different 'Dominance parameters of your microbiome
+#Berger-Parker metric, which indicates the proportion of the most abundant taxon relative to all others
+library(microbiome)
+dom_idtax <-dominance(Phyloseq_Object_idtax, index = "all", rank = 1, aggregate = T)
+dominance
+help("dominance")
+#Here there are several dominance metrics calculated for your different samples, information can be found in the help tab. I personally use Berger-Parker metric, others are also interesting. 
+#Another interesting feature which is usefull is the following, where you can find the most dominant feature identity. So you can see for example at the level of family, which family is present the most in the samples. If this is for example Pseudomonas, Acinetobacter or other known degrading families, then this could be an indication of bio degradation.
+Dom_taxon <- dominant(Phyloseq_Object, level = 'family')
+###################################################
+###informative diversity (Shannon)###
+#A value that reflects how many different microbes are in the sample and how evenly they are distributed within the sample
+alpha_diversit_id_tax <-  alpha(Phyloseq_Object, index = c('shannon')
+#help(alpha)
+write.table(alpha_diversit_id_tax, file = "Shannon_diversit_id_tax.csv", row.names = T, sep = ";", dec = ",")
+###################################################
+###Species richness (Observed)###
+#A measure of how many different ASV/OTUs are present in each samples. This gives information with regard to the species richness.
+alpha_diversit_id_tax <-  alpha(Phyloseq_Object, index = c('observed')
+#help(alpha)
+write.table(alpha_diversit_id_tax, file = "Shannon_diversit_id_tax.csv", row.names = T, sep = ";", dec = ",")
+###For me up until this point, these are all alfa diversity metrics I am interested in####
+```
+
+#Beta diversity
+```{r}
+#This for a large part can be done using the microbiome analyst tools:
+#This is largly dependent on the specific research question at hand. 
+mbSet<-PerformBetaDiversity(mbSet, "beta_diver_0","PCoA","bray","expfac","SC_number","none","OTU","","Shannon", "yes", "adonis", "png", 72, "default", "true");
+mbSet<-PCoA3D.Anal(mbSet, "PCoA","bray","OTU","expfac","SC_number","","Shannon","beta_diver3d_0.json")
+mbSet<-PerformCategoryComp(mbSet, "OTU", "adonis","bray","SC_number","true");
+#Example research question: How much do the different communities look like one another on a phylogenetic level, based on the presence/absence of different features ?
+mbSet<-PCoA3D.Anal(mbSet, "PCoA","unifrac","OTU","expfac","SC_number","","Shannon","beta_diver3d_2.json")
+mbSet<-PerformCategoryComp(mbSet, "OTU", "adonis","unifrac","SC_number","true");
+#Example research question: How much do the different communities look like one another on a phylogenetic level, taking into account the abundance of the different features?
+mbSet<-PCoA3D.Anal(mbSet, "PCoA","wunifrac","OTU","expfac","SC_number","","Shannon","beta_diver3d_3.json")
+mbSet<-PerformCategoryComp(mbSet, "OTU", "adonis","wunifrac","SC_number","true");
+#This varies a lot based on the specific research question.
+#additionally, the ordination is also depend on what you want to know, this is expert knowlegde, and therefore multiple ordination options should be included into the tool:
+#PCoA, PCA and NMDS are the ordination options in microbiome analyst
+```
+
+
+#Core microbiome analysis/ Tax4fun, to look at the specific groups/traits found in the 
+# different samples
+```{r}
+# Usefull for exploratory analysis, some target groups could be identified from literature, to indicate whether there are aerobic/ anaerobic degraders present.
+#Example you can check whether known biodegraders are present : Burkholderiales, Sphingomonadales, Pseudomonadales,...
+mbSet<-CoreMicrobeAnalysis(mbSet, "core_micro_13",0.1,0.01,"Order","bwm","bar", "smpl_grp_all", "SampleNumber", "1", "SampleNumber", "png")
+
+#This is probably related to the Tax4Fun function, which will try to link functional traits to different taxa found. So it might just be usefull to use the Tax4Fun to link specific phylogenetic groups to different functions, instead of manually choosing certain groups which are 'known degraders'.
+mbSet<-Perform16FunAnot_mem(mbSet, "SILVA","qi_silva","gg13");
+mbSet<-PlotFunAnotSummary(mbSet, "tax4fun_ko_0","png","tax4fun");
+#So probably this will yield similar results, If you do Tax4Fun, you get a KO orthology table, which is very similar to functional traits of shotgun sequencing output. 
+```
+
+
+
+```{r}
+
+
+
+
+
+merge phylotree
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
