@@ -1,6 +1,6 @@
 # `mibibio` Methods Overview
 
-Methods implemented for comprehensive statistical, visual and meta-analysis of large, complex microbiome datasets derived from high-throughput sequencing (16S rRNA amplicon, shotgun metagenomics or metatranscriptomics). Most routines wrap—or reproduce programmatically—the functionality of the MicrobiomeAnalyst web suite and its underlying R packages, so that analyses can be executed reproducibly from the command line or in notebooks. The workflow includes:
+Methods implemented for comprehensive statistical, visual and meta-analysis of large, complex microbiome datasets derived from high-throughput sequencing (16S rRNA amplicon, shotgun metagenomics or metatranscriptomics). Most routines wrap, or reproduce programmatically, the functionality of the MicrobiomeAnalyst website and its underlying R packages, so that analyses can be executed reproducibly from the command line or in notebooks. The workflow includes:
 
 ## Filtering methods — removing uninformative or misleading features
 ### Low-information feature removal (`filter_features()`)
