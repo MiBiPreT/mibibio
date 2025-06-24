@@ -14,6 +14,10 @@ git clone git@github.com:MiBiPreT/mibibio.git
 cd mibibio
 ```
 
+## Method Overview
+
+You can find the overview of the methods implemented for comprehensive statistical, visual and meta-analysis of large and complex microbiome datasets [here](./docs/methods/methods.md)
+
 ## Contributing
 
 If you want to contribute to the development of mibibio,
