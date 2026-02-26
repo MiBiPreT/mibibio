@@ -1,0 +1,284 @@
+---
+title: "Pollution_graph"
+output: html_document
+date: "2025-03-26"
+---
+Set the working directory for the whole documents
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE
+)
+knitr::opts_knit$set(root.dir = "C:/Amplicon_sequencing_analysis/SIMON_SCRIPTS_2025/R_Scripts/Redox/Theoretical_Plots")
+```
+
+Libraries
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(reshape2)
+library(dplyr)
+# ------------------------------------------------
+# 1. Electron acceptor properties
+# ------------------------------------------------
+acceptors <- tibble(
+  acceptor = c(
+    "O2/CO2",
+    "NO3-/N2",
+    "Mn4+/Mn2+",
+    "Fe3+/Fe2+",
+    "SO4^2-/HS-",
+    "CO2/CH4"
+  ),
+  ATP_yield = c(
+    72,
+    67.9,
+    47.9,
+    20,
+    4.1,
+    1.2
+  ),
+  # environmental concentrations of the different electron acceptors, this is however very site specific, currently these are high environmental ranges of these different electron acceptors.
+  #However it would be intersting to let these be dynamic with for example a groundwater/pollution flow model
+  conc_mgL = c(
+    13,     # oxygen
+    100,    # nitrate
+    620,    # manganese
+    30000,  # iron
+    2000,   # sulfate
+    88      # carbon dioxide
+  ),
+# A calculation of how much gram of electron acceptor is consumed per gram of napthalene, this connects the measurements of naphalene, or other environmental pollutant or combinations of pollutants (depending on the interest) to the amount in gram of electron acceptor which is consumed. Because these vary per electron acceptor, due to differences in number of electron which can be accepted and the molecular weight of the specific electron acceptor. see tables in word document for information on this.
+  Electron_Acceptor_consumption = c(
+    1.49,
+    4.64,
+    10.28,
+    20.90,
+    4.50,
+    2.06
+  )
+)
+
+```
+
+
+```{r}
+# ------------------------------------------------
+# 1. Calculate the maximum napthalene which can be consumed in ideal conditions. 
+#Basically calculate how much gram of napthalene can be consumed given the inputed environemental concentrations give the electron acceptors 
+# ------------------------------------------------
+str(acceptors)
+acceptors <- acceptors %>%
+  mutate(
+    Electron_Acceptor_Specific_capacity_Limit =
+      conc_mgL / Electron_Acceptor_consumption
+  )
+# ------------------------------------------------
+# 2. DEFINE CONDITIONS (EDIT FREELY)
+# This could be interesing to play with (now i model that each conditions is 100 one electron acceptor, but it would be nice to have multiple electron acceptors being used at the same time. to better mimic environmental concentrations. This ratio's between the different electron accpetors would be based on the availability of these, which changes depending on the site, but could I think be estimated quite clearly based on some calculations on measured redox parameters)
+# ------------------------------------------------
+conditions <- tribble(
+  ~condition,            ~acceptor,      ~fraction,
+  "O2/CO2",          "O2/CO2",        1.0,
+  "NO3-/N2",          "NO3-/N2",       1.0,
+  "Mn4+/Mn2+",    "Mn4+/Mn2+",       1.0,
+  "Fe3+/Fe2+",    "Fe3+/Fe2+",       1.0,
+  "SO4^2-/HS-",   "SO4^2-/HS-",      1.0,
+  "CO2/CH4",      "CO2/CH4",    1.0,
+)
+#calculate the different parameters for the model. This would then be nice to see change, with cases where multiple electron acceptors are used, however now it just has fractions of 1 so, the calculations are quite simple. 
+model <- conditions %>%
+  left_join(acceptors, by = "acceptor") %>%
+  mutate(
+    energy_component =
+      ATP_yield * fraction,
+    capacity_component =
+      Electron_Acceptor_Specific_capacity_Limit * fraction
+  ) %>%
+  group_by(condition) %>%
+  summarise(
+    electron_acceptor_yield   = sum(energy_component),
+    mg_napthalene_per_liter = sum(capacity_component),
+    .groups = "drop"
+  )
+# ------------------------------------------------
+# 4. Convert to growth parameters
+# ------------------------------------------------
+# Here is where the biology part starts, I am basically modeling the population growth using this simple population growth model, the reasoning behind it is explained in the word document. Basically, higher energy yield per electron accepor = fast growth, shorter generations. The carrying capacity is based on how much naphthalene can be oxidised at the same time (limited by the electron acceptor capacity of an electron acceptor at a given time) This now uses very high environmental concentrations. And the model now assumes that at high population density there is also no real consumption of the electron acceptor and it is replenished infinetly. It would be cool to also model the fact that when the microbial populations grow, they also consume the electron acceptors. For some like ferric iron, there is no easy replenishment due to solubility issues, but for nitrate and sulphate, you could model in a 'replenishing rate' in which nitrate or sulphate rich groundwater flows in, maintaining a stable influx of electron acceptors.
+model <- model %>%
+  mutate(
+    r = electron_acceptor_yield / max(electron_acceptor_yield),   # growth rate
+    K = mg_napthalene_per_liter  # carrying capacity
+  )
+# ------------------------------------------------
+# 5. Logistic growth
+#specifying which time parametrs in the model we are interested in.
+# ------------------------------------------------
+time <- seq(0, 150, length.out = 50)
+P0 <- 1
+growth <- model %>%
+  crossing(time = time) %>%
+  mutate(
+    biomass = K / (1 + ((K - P0)/P0) * exp(-r * time))
+  )
+# ------------------------------------------------
+# 6. Plot with filled area
+# ------------------------------------------------
+ggplot() +
+  # shaded carrying capacity
+  geom_ribbon(
+    data = growth,
+    aes(
+      x = time,
+      ymin = 0,     # small value instead of 0
+      ymax = K,
+      fill = condition
+    ),
+    alpha = 0.15
+  ) +
+  # growth curves
+  geom_line(
+    data = growth,
+    aes(time, biomass, colour = condition),
+    size = 1.2
+  ) +
+  scale_y_log10() +
+  labs(
+    x = "Time",
+    y = "Napthalene which can be degraded by the population (mg L⁻¹, log scale)",
+    colour = "Condition",
+    fill = "Capacity limit"
+  ) +
+  theme_minimal(base_size = 14)
+
+
+
+# ------------------------------------------------
+# 7. Export SVG (for Inkscape)
+# ------------------------------------------------
+#ggsave("electron_acceptor_thresholds.svg",
+      # p, width = 8, height = 5)
+
+
+```
+# make the graphs look better, just cosmetic
+```{r}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+#Customize the parameters
+time <- seq(0, 10, length.out = 50)
+P0 <- 1
+growth <- model %>%
+  crossing(time = time) %>%
+  mutate(
+    biomass = K / (1 + ((K - P0)/P0) * exp(-r * time))
+  )
+
+# Define custom colors for each condition
+line_colors <- c(
+  "O2/CO2"   = "#EE8500",
+  "NO3-/N2"  = "#C2000E",
+  "Mn4+/Mn2+"= "#0009B8",
+  "Fe3+/Fe2+"= "#FFF01C",
+  "SO4^2-/HS-"= "#009590",
+  "CO2/CH4"  = "#C300E5"
+)
+
+ribbon_colors <- line_colors  # can use same or different palette
+# -------------------------------
+# Map conditions to plotmath expressions, so the sub and superscript are correctly used
+# -------------------------------
+condition_labels <- expression(
+  paste(O[2], "/", CO[2]),
+  paste(NO[3]^"-", "/", N[2]),
+  paste(Mn^"4+", "/", Mn^"2+"),
+  paste(Fe^"3+", "/", Fe^"2+"),
+  paste(SO[4]^"2-", "/", HS^"-"),
+  paste(CO[2], "/", CH[4])
+)
+
+growth <- growth %>%
+  mutate(
+    condition = factor(condition, levels = c(
+      "O2/CO2",
+      "NO3-/N2",
+      "Mn4+/Mn2+",
+      "Fe3+/Fe2+",
+      "SO4^2-/HS-",
+      "CO2/CH4"
+    ))
+  )
+# -------------------------------
+# Plot
+# -------------------------------
+p <- ggplot() +
+  # shaded carrying capacity
+  geom_ribbon(
+    data = growth,
+    aes(
+      x = time,
+      ymin = 1,        # start at 1 for log scale
+      ymax = K,
+      fill = condition
+    ),
+    alpha = 0.2
+  ) +
+  # growth curves
+  geom_line(
+    data = growth,
+    aes(time, biomass, colour = condition),
+    size = 1.2
+  ) +
+  scale_y_log10(
+    limits = c(1, NA),
+    breaks = c(1, 10, 100, 1000, 10000)
+  ) +
+   scale_x_continuous(
+    breaks = c( 0,2.5,5,7.5, 10, 50, 100, 150)
+  ) +
+  scale_colour_manual(
+    values = line_colors,
+    labels = condition_labels
+  ) +
+  scale_fill_manual(
+    values = ribbon_colors,
+    labels = condition_labels
+  ) +
+  labs(
+    x = "Time (Relative)",
+    y = "Maximum napthalene \nconsumption (mg L⁻¹ Log scale)",
+    colour = "Growth of specific \nelectron acceptor consumer",
+    fill = "Electron acceptor \ncapacity limit"
+  ) +
+  theme_minimal(base_size = 19) +
+  theme(
+    legend.position = "top",
+    legend.title = element_text(face = "bold"),
+    panel.grid.minor = element_blank()
+  )
+plot(p)
+
+ggsave(
+  filename = "bacterial_growth_curves_small_scale.svg",  # choose your file name
+  plot = last_plot(),                        # saves the most recent plot
+  width = 16,                                 # width in inches
+  height = 9,                                # height in inches
+  units = "in",
+  dpi = 300                                  # dpi doesn’t matter much for SVG, but set anyway
+)
+
+
+
+
+
+
+
+
+
+
+
+
+```
+
